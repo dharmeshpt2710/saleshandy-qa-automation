@@ -1,0 +1,21 @@
+
+node_modules/
+
+# Playwright artifacts
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
+# Saved authentication state. Never commit these, they are live sessions.
+/.auth/
+*.auth.json
+
+# Environment and secrets
+.env
+.env.local
+
+# OS and editor noise
+.DS_Store
+Thumbs.db
+.idea/
