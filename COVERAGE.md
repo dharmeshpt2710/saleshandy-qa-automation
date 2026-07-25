@@ -1,6 +1,6 @@
 # Automation Coverage Summary
 
-Maps every manual test case in [`Saleshandy-Test-Cases.docx`](Saleshandy-Test-Cases.docx) to the automated suite, and states plainly what is not automated and why.
+Maps every manual test case in [`Saleshandy-Test-Cases.docx`](Saleshandy-Test-Cases.docx) ([on Google Docs](https://docs.google.com/document/d/1Etnz5_SL-S5EYRfVXqAt9l2AzoUqeG3pGNxoyhNl9Hc/edit?usp=sharing)) to the automated suite, and states plainly what is not automated and why.
 
 Companion to [README.md](README.md), which covers setup, how to run, framework design and assumptions.
 

@@ -7,6 +7,7 @@ The core idea of the assignment is that each account type has its own sign-up fo
 - **App under test:** https://my.saleshandy.com/
 - **Tool:** Playwright with TypeScript
 - **Browser:** Chromium
+- **Test case document:** [`Saleshandy-Test-Cases.docx`](Saleshandy-Test-Cases.docx) in this repo, or the same document [on Google Docs](https://docs.google.com/document/d/1Etnz5_SL-S5EYRfVXqAt9l2AzoUqeG3pGNxoyhNl9Hc/edit?usp=sharing) if you would rather not clone.
 
 ---
 
@@ -230,7 +231,7 @@ The onboarding spec asserts every option on every step is visible before answeri
 
 ### Deliverables
 
-- **Test case document:** [`Saleshandy-Test-Cases.docx`](Saleshandy-Test-Cases.docx), 22 manual cases across sign-up, onboarding and account-specific validations.
+- **Test case document:** [`Saleshandy-Test-Cases.docx`](Saleshandy-Test-Cases.docx), 22 manual cases across sign-up, onboarding and account-specific validations. Also readable [on Google Docs](https://docs.google.com/document/d/1Etnz5_SL-S5EYRfVXqAt9l2AzoUqeG3pGNxoyhNl9Hc/edit?usp=sharing).
 - **Automation coverage summary:** [`COVERAGE.md`](COVERAGE.md), mapping every manual case to automated, partial or manual-only, with the reason for each gap and the current verification status against the live app.
 
 > **Note on the sign-up path (as of 2026-07-25).** The live sign-up form is currently returning `"You have hit max signup limit. Try again after some time."` for every email address tried. This is an IP / account-level rate limit on the Saleshandy side, not a problem with the test data or selectors. While it is in effect, the specs that create a brand-new account (`signup.spec.ts` and `onboarding.spec.ts`) cannot be run end to end against the live app, and the Business and Clients onboarding steps in particular remain unverified against production UI. The code, page objects, and data for those flows are in place and follow the same verified pattern as the account-specific specs; they are expected to pass once sign-up access is restored. The account-specific specs (`account-specific.spec.ts`) are unaffected, because they reuse the pre-created accounts and never sign up.
