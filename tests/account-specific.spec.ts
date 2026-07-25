@@ -1,16 +1,14 @@
-import { test, expect } from '../src/fixtures';
+import { test } from '../src/fixtures';
 import { AccountType } from '../src/types';
-import { ACCOUNT_TYPE_CARD } from '../src/utils/constants';
+import { ACCOUNT_TYPE_CARD, DASHBOARD_URL } from '../src/utils/constants';
+import { GoToUrl, expectUrl, expectHidden } from '../src/utils/helpers';
 
-// Account-specific tests that reuse a saved session (assignment section 4.3).
-//
-// Each block declares its account with `test.use({ account })`; the fixture
-// loads that account's saved session, so the test starts already signed in and
-// already onboarded. No login happens here.
-//
-// The same assertion runs for all three account types, differing only by the
-// account passed in — the same "one generic flow, data decides the rest" idea
-// as the sign-up code.
+/**
+ * Account-specific tests that reuse a saved session (assignment 4.3). Each block
+ * says test.use({ account }) and the fixture loads that account's session, so the
+ * test starts already logged in and onboarded, no login here. The same check runs
+ * for all three types, only the account changes.
+ */
 const accountTypes: AccountType[] = ['personal', 'business', 'clients'];
 
 for (const account of accountTypes) {
@@ -18,11 +16,15 @@ for (const account of accountTypes) {
     test.use({ account });
 
     test(`TC-OB-08: an onboarded ${account} user is not shown onboarding again`, async ({ page }) => {
-      await page.goto('/');
+      await GoToUrl(page);
 
-      // Because this user already finished onboarding, its account-type card
-      // does not appear again.
-      await expect(page.getByText(ACCOUNT_TYPE_CARD[account])).toBeHidden();
+      // Reused session is logged in, we land on the dashboard and not back on
+      // /login. This is what proves the reuse really worked, a stale session
+      // would redirect here and fail.
+      await expectUrl(page, DASHBOARD_URL);
+
+      // Already onboarded, so the account-type card is not shown again.
+      await expectHidden(page.getByText(ACCOUNT_TYPE_CARD[account]));
     });
   });
 }

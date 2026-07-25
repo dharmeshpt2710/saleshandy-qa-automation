@@ -1,23 +1,35 @@
 import { test as setup } from '@playwright/test';
 import fs from 'fs';
-import { signUp } from '../src/auth/signUp';
+import { LoginPage } from '../src/pages/LoginPage';
+import { credentialsFor } from '../src/data/credentials';
 import { AccountType } from '../src/types';
-import { AUTH_DIR, sessionStatePath } from '../src/utils/helpers';
+import { AUTH_DIR, GoToUrl, hasFreshSession, sessionStatePath } from '../src/utils/helpers';
 
-// This is how we avoid logging in on every test (assignment section 4.3).
-//
-// It runs once, before the real tests. For each account type it creates a user,
-// finishes onboarding, and saves that logged-in browser session to a file under
-// .auth/. The real tests then load that file and start already logged in, so we
-// never repeat sign-up or login.
-//
-// We need three separate users because the account type is permanent and cannot
-// be changed after onboarding.
+/**
+ * Login once per account and save the session, so the real tests don't login
+ * again (assignment 4.3). Each type has one pre-created account, we log into it,
+ * save the browser session under .auth/ and the tests reuse that file.
+ *
+ * Playwright re-runs setup every time, so we also skip the login when a recent
+ * session file is already there, that keeps login from repeating run after run.
+ * Use FORCE_LOGIN=1 to force it. We keep three accounts because the account type
+ * can't be changed once onboarded.
+ */
 const accountTypes: AccountType[] = ['personal', 'business', 'clients'];
 
 for (const type of accountTypes) {
-  setup(`create ${type} user and save session`, async ({ page }) => {
-    await signUp(page, type);
+  setup(`log in ${type} account and save session`, async ({ page }) => {
+    setup.skip(hasFreshSession(type), 'A recent saved session already exists');
+
+    // Login needs a manual OTP, so give it enough time.
+    setup.setTimeout(3 * 60_000);
+
+    const { email, password } = credentialsFor(type);
+
+    const loginPage = new LoginPage(page);
+    await GoToUrl(page);
+    await loginPage.login(email, password);
+    await loginPage.completeOtpManually();
 
     fs.mkdirSync(AUTH_DIR, { recursive: true });
     await page.context().storageState({ path: sessionStatePath(type) });

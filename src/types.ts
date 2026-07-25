@@ -8,3 +8,10 @@ export interface TestUser {
   email: string;
   password: string;
 }
+
+// Login credentials for a pre-created, long-lived account (one per account
+// type). Read from .env and used once per run by auth.setup.ts.
+export interface LoginCredentials {
+  email: string;
+  password: string;
+}

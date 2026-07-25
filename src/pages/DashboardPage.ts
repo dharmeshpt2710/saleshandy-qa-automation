@@ -1,19 +1,27 @@
-import { Page, expect } from '@playwright/test';
+import { Locator, Page } from '@playwright/test';
+import { expectVisible } from '../utils/helpers';
 
-// Page object for the two dashboards a user can land on after onboarding.
-// Which one you land on depends on the product choice, not the account type:
-// "Lead Finder" lands on Lead Finder, everything else lands on Sequences.
-// These selectors still need confirming against the live app.
+/**
+ * Page object for the dashboards a user can land on after onboarding. Which one
+ * shows up depends on the product choice and not the account type, "Lead Finder"
+ * goes to Lead Finder and everything else goes to Sequences.
+ */
 export class DashboardPage {
-  constructor(private page: Page) {}
 
-  // Sequences is the default landing dashboard.
-  async expectSequencesDashboard() {
-    await expect(this.page.getByRole('button', { name: /let'?s start/i })).toBeVisible();
+  readonly btnLetsStart: Locator;
+  readonly companiesTab: Locator;
+
+  constructor(private page: Page) {
+
+    this.btnLetsStart = this.page.getByRole('button', { name: /let'?s start/i });
+    this.companiesTab = this.page.getByRole('tab', { name: 'Companies' });
   }
 
-  // Lead Finder dashboard, reached only when the product choice was "Lead Finder".
+  async expectSequencesDashboard() {
+    await expectVisible(this.btnLetsStart);
+  }
+
   async expectLeadFinderDashboard() {
-    await expect(this.page.getByRole('tab', { name: 'Companies' })).toBeVisible();
+    await expectVisible(this.companiesTab);
   }
 }
