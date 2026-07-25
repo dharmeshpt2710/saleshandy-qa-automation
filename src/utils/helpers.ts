@@ -2,25 +2,47 @@ import fs from 'fs';
 import { Locator, Page, expect } from '@playwright/test';
 import { AccountType } from '../types';
 
+// ── Navigation ──────────────────────────────────────────────────────────────
+
 // Go to the app's base URL (empty path resolves to baseURL in the config).
-export async function GoToUrl(page: Page): Promise<void> {
-  await page.goto('');
+// It is an SPA, so waiting for the full load event is slow and can time out.
+export async function goToUrl(page: Page): Promise<void> {
+  await page.goto('', { waitUntil: 'domcontentloaded' });
 }
 
-// Assert the current URL; auto-waits until it matches. Accepts a string or RegExp.
+// ── Assertions ──────────────────────────────────────────────────────────────
+// Thin wrappers over expect(), so page objects and specs read as intent and a
+// matcher change is a one-line edit here. All of them auto-wait.
+
 export async function expectUrl(page: Page, url: string | RegExp): Promise<void> {
   await expect(page).toHaveURL(url);
 }
 
-// Assert a locator is visible; auto-waits until it is.
 export async function expectVisible(locator: Locator): Promise<void> {
   await expect(locator).toBeVisible();
 }
 
-// Assert a locator is hidden/absent; auto-waits until it is.
 export async function expectHidden(locator: Locator): Promise<void> {
   await expect(locator).toBeHidden();
 }
+
+export async function expectDisabled(locator: Locator): Promise<void> {
+  await expect(locator).toBeDisabled();
+}
+
+export async function expectEnabled(locator: Locator): Promise<void> {
+  await expect(locator).toBeEnabled();
+}
+
+export async function expectContainsText(locator: Locator, text: string): Promise<void> {
+  await expect(locator).toContainText(text);
+}
+
+export async function expectCount(locator: Locator, count: number): Promise<void> {
+  await expect(locator).toHaveCount(count);
+}
+
+// ── Saved sessions ──────────────────────────────────────────────────────────
 
 // One place for the saved session path, so the code that writes it (auth.setup)
 // and the one that reads it (fixtures) can't drift apart.

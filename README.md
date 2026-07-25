@@ -54,9 +54,13 @@ The core idea of the assignment is that each account type has its own sign-up fo
 
    CLIENTS_EMAIL=
    CLIENTS_PASSWORD=
+
+   DELETED_ACCOUNT_EMAIL=
    ```
 
-   These are the long-lived accounts (one per account type) that the suite logs into once and reuses. `.env` is git-ignored, so real credentials are never committed. See [Avoiding repeated login](#avoiding-repeated-login-assignment-43) for why these accounts exist.
+   The first three are the long-lived accounts (one per account type) that the suite logs into once and reuses. `.env` is git-ignored, so real credentials are never committed. See [Avoiding repeated login](#avoiding-repeated-login-assignment-43) for why these accounts exist.
+
+   `DELETED_ACCOUNT_EMAIL` is a real inbox that was signed up and then permanently deleted; `TC-SU-07` asserts the form refuses to sign it up again. It lives in `.env` rather than in the repo because it is a personal address.
 
 ---
 
@@ -111,7 +115,7 @@ saleshandy-sdet-assignment/
 │   │   ├── userData.ts         #   sign-up user builder + Gmail dot-variant email generator
 │   │   └── credentials.ts      #   reads the 3 accounts from .env
 │   │
-│   ├── pages/                  # Page Objects (locators + actions, no assertions of intent)
+│   ├── pages/                  # Page Objects (private locators, actions, expect* methods)
 │   │   ├── SignUpPage.ts
 │   │   ├── LoginPage.ts
 │   │   ├── OnboardingPage.ts   #   one generic driver for all account types
@@ -124,8 +128,8 @@ saleshandy-sdet-assignment/
 │   │   └── index.ts            # custom fixture: test.use({ account }) loads that account's session
 │   │
 │   └── utils/
-│       ├── constants.ts        # shared paths, card text, selectors
-│       └── helpers.ts          # assertion helpers + session path / freshness logic
+│       ├── constants.ts        # shared paths, card text, selectors, error messages
+│       └── helpers.ts          # navigation + assertion helpers, session path / freshness logic
 │
 └── tests/
     ├── auth.setup.ts           # logs into each account once, saves session under .auth/
@@ -133,6 +137,17 @@ saleshandy-sdet-assignment/
     ├── onboarding.spec.ts      # full fresh sign-up + onboarding, one run per account type
     └── account-specific.spec.ts# reuses saved sessions, asserts account-specific state
 ```
+
+### Assertion convention
+
+Locators are `private` to their page object. Nothing outside a page object touches a raw `Locator`, so a selector change never reaches a spec.
+
+Assertions come in two layers:
+
+- **`src/utils/helpers.ts`** wraps the Playwright matchers as `expectVisible`, `expectHidden`, `expectUrl`, `expectDisabled`, `expectEnabled`, `expectContainsText`, and `expectCount`. Changing a matcher is a one-line edit here.
+- **Page objects** expose `expect*` methods named after the business rule, not the matcher: `expectSignUpBlocked()`, `expectServerError(message)`, `expectAccountTypeScreen(type)`. A spec reads as requirements, and the method stays truthful if the UI changes how it expresses the rule (a disabled button becoming a hidden one, say).
+
+The specs therefore import `test` only. They never import `expect`.
 
 ### How the "one generic flow" requirement is met
 
@@ -165,10 +180,34 @@ The result maps directly to the 4.3 checklist: login is not repeated in every te
 
 | Spec | Scenario | Type | Runs per account type |
 | --- | --- | --- | --- |
-| `signup.spec.ts` | New user can sign up with valid data (`TC-SU-01`) | Positive | Personal only |
-| `signup.spec.ts` | Sign-up blocked when a required field is missing (`TC-SU-02`) | Negative | Personal only |
+| `signup.spec.ts` | New user can sign up with valid data and an optional phone number (`TC-SU-01`) | Positive | Personal only |
+| `signup.spec.ts` | Required fields show inline errors, sign up stays disabled (`TC-SU-02`) | Negative, `@client` | Personal only |
+| `signup.spec.ts` | Password under 8 characters keeps sign up disabled (`TC-SU-03`) | Negative, `@client` | Personal only |
+| `signup.spec.ts` | Non-alphabetic characters in the name fields are rejected (`TC-SU-05`) | Negative, `@client` | Personal only |
+| `signup.spec.ts` | Plus-addressed email is rejected (`TC-SU-06`) | Negative, `@server` | Personal only |
+| `signup.spec.ts` | Email of a previously deleted account is rejected (`TC-SU-07`) | Negative, `@server` | Personal only |
+| `signup.spec.ts` | Disposable email domain is rejected (`TC-SU-08`) | Negative, `@server` | Personal only |
+| `signup.spec.ts` | Sign-up blocked once the max signup limit is hit (`TC-SU-09`) | Negative, `@ratelimit`, **skipped** | Personal only |
 | `onboarding.spec.ts` | Full onboarding completes through every step (`TC-OB`) | Positive | Personal, Business, Clients |
-| `account-specific.spec.ts` | An onboarded user is not shown onboarding again (`TC-OB-08`) | Account-specific | Personal, Business, Clients |
+| `account-specific.spec.ts` | An onboarded user lands on the Sequences dashboard and is not shown onboarding again (`TC-OB-08`) | Account-specific | Personal, Business, Clients |
+
+### How the sign-up spec is grouped
+
+`signup.spec.ts` nests its cases in `test.describe` blocks that reflect what each case actually costs:
+
+- **`client-side validation` (`@client`)** never submits the form. These assert inline field errors and the disabled state of the sign-up button, so they create no account, burn no email address, and run fully in parallel.
+- **`server-side rejection` (`@server`)** submits the form for real, so every case consumes one Gmail dot-variant and one attempt against Saleshandy's sign-up rate limit. The block is `test.describe.configure({ mode: 'serial' })` so the cases don't race each other into that limit.
+
+Run one group on its own with a tag:
+
+```bash
+npx playwright test --grep @client     # fast, no accounts created
+npx playwright test --grep @server     # submits for real, serial
+```
+
+**`TC-SU-09` is skipped by default.** Tripping the max-signup limit is the point of that test, but once tripped it fails `TC-SU-01` and the whole of `onboarding.spec.ts` until the limit lifts. It is kept in the suite as executable documentation of the behaviour, tagged `@ratelimit`, and must be un-skipped deliberately and run in isolation.
+
+`TC-SU-04` is intentionally absent: it was the original combined codegen recording that `TC-SU-02` and `TC-SU-05` through `TC-SU-09` were split out of, so the id is retired rather than reused.
 
 The onboarding spec asserts every option on every step is visible before answering, so it doubles as an account-specific UI check: a Personal run only ever sees Personal questions, and so on. A separate, fuller test-case document and coverage summary accompany this repo per the deliverables.
 

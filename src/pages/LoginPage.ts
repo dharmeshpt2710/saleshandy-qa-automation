@@ -2,16 +2,15 @@ import { Locator, Page } from '@playwright/test';
 import { DASHBOARD_URL } from '../utils/constants';
 import { expectVisible, expectUrl } from '../utils/helpers';
 
-/**
- * Page object for the log-in form. Selectors are taken from a codegen recording
- * of the live login.
- */
+// Page object for the log-in form.
 export class LoginPage {
-  readonly emailInput: Locator;
-  readonly passwordInput: Locator;
-  readonly loginButton: Locator;
-  readonly verificationHeading: Locator;
-  readonly sequenceDashboardHeading: Locator;
+  // ── Locators ──────────────────────────────────────────────────────────────
+  // Taken from a codegen recording of the live login.
+  private readonly emailInput: Locator;
+  private readonly passwordInput: Locator;
+  private readonly loginButton: Locator;
+  private readonly verificationHeading: Locator;
+  private readonly sequenceDashboardHeading: Locator;
 
   constructor(private page: Page) {
     this.emailInput = this.page.getByRole('textbox', { name: 'Enter your work email address' });
@@ -21,11 +20,10 @@ export class LoginPage {
     this.sequenceDashboardHeading = this.page.getByRole('heading', { name: 'Sequence' });
   }
 
-  // baseURL already points at the login url, so an empty path opens it.
+  // ── Actions ───────────────────────────────────────────────────────────────
 
-
-  // Fill the credentials and submit. Login always send an OTP so it does not
-  // finish here, the caller must run completeOtpManually after this.
+  // Login always sends an OTP, so it does not finish here. The caller must run
+  // completeOtpManually after this.
   async login(email: string, password: string) {
     await this.emailInput.fill(email);
     await this.passwordInput.fill(password);
@@ -33,9 +31,9 @@ export class LoginPage {
   }
 
   /**
-   * On every login Saleshandy sends a 4 digit OTP on the email. We can't read
-   * the inbox, so a person has to type it in the browser. Here we wait for the
-   * code screen, then wait till the app reaches the Sequence dashboard.
+   * On every login Saleshandy emails a 4 digit OTP. We can't read the inbox, so a
+   * person types it into the browser. Wait for the code screen, then wait until
+   * the app reaches the Sequence dashboard.
    */
   async completeOtpManually() {
     await expectVisible(this.verificationHeading);

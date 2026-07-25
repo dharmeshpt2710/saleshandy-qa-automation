@@ -1,4 +1,5 @@
 import { Locator, Page } from '@playwright/test';
+import { SEQUENCE_HEADING } from '../utils/constants';
 import { expectVisible } from '../utils/helpers';
 
 /**
@@ -7,18 +8,36 @@ import { expectVisible } from '../utils/helpers';
  * goes to Lead Finder and everything else goes to Sequences.
  */
 export class DashboardPage {
-
-  readonly btnLetsStart: Locator;
-  readonly companiesTab: Locator;
+  // ── Locators ──────────────────────────────────────────────────────────────
+  private readonly btnLetsStart: Locator;
+  private readonly sequenceHeading: Locator;
+  private readonly companiesTab: Locator;
 
   constructor(private page: Page) {
-
     this.btnLetsStart = this.page.getByRole('button', { name: /let'?s start/i });
+    this.sequenceHeading = this.page.getByRole('heading', { name: SEQUENCE_HEADING });
     this.companiesTab = this.page.getByRole('tab', { name: 'Companies' });
   }
 
+  // ── Actions ───────────────────────────────────────────────────────────────
+
+  // Some sessions land on a "Let's Start" screen first, and clicking it opens the
+  // Sequences dashboard. It is not always shown, so only click it when it is.
+  async dismissLetsStartIfShown() {
+    const isShown = await this.btnLetsStart
+      .waitFor({ state: 'visible', timeout: 5_000 })
+      .then(() => true)
+      .catch(() => false);
+
+    if (isShown) {
+      await this.btnLetsStart.click();
+    }
+  }
+
+  // ── Assertions ──────────────────────────────────────────────────────────
+
   async expectSequencesDashboard() {
-    await expectVisible(this.btnLetsStart);
+    await expectVisible(this.sequenceHeading);
   }
 
   async expectLeadFinderDashboard() {
