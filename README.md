@@ -20,6 +20,23 @@ The core idea of the assignment is that each account type has its own sign-up fo
 | Config / secrets | `dotenv` (`.env` file, git-ignored) |
 | Reporting | Playwright HTML reporter |
 | CI | GitHub Actions (`.github/workflows/playwright.yml`) |
+| Exploratory testing notes | Otter.ai (voice capture during manual sessions) |
+| AI assistance | Claude Code (scaffolding, refactoring, review) |
+
+---
+
+## Approach
+
+Behaviour was established by hand before any of it was automated.
+
+1. **Exploratory testing.** Every flow was walked manually across all three account types first. Otter.ai ran during those sessions to capture a spoken commentary, so findings were recorded as they happened instead of being reconstructed from memory afterwards.
+2. **Test case design.** Those notes became the 22 manual cases in [`Saleshandy-Test-Cases.docx`](Saleshandy-Test-Cases.docx), covering positive, negative, edge and account-type-specific scenarios.
+3. **Automation.** The important cases were automated against behaviour already confirmed by hand, which is why the suite asserts exact product strings rather than generic "an error appears" checks.
+4. **Coverage review.** Every manual case was then mapped back to the suite in [`COVERAGE.md`](COVERAGE.md), including the ones deliberately left manual and why.
+
+Nothing here is asserted from guesswork. The plus-addressing rejection, the blacklisted disposable domains, the refusal to reuse a deleted account's email, the IP-level sign-up limit, the conditional "Let's Start" gate on the Sequences dashboard, and the Personal-only volume question that branches on product choice were all discovered through manual testing, then encoded as assertions.
+
+Claude Code was used throughout for scaffolding, refactoring and review, per the assignment's allowance for an AI assistance tool. The engineering decisions it implements are deliberate and documented: what belongs in a page object, which tests are allowed to submit the form, and what is skipped rather than run.
 
 ---
 
@@ -207,9 +224,14 @@ npx playwright test --grep @server     # submits for real, serial
 
 **`TC-SU-09` is skipped by default.** Tripping the max-signup limit is the point of that test, but once tripped it fails `TC-SU-01` and the whole of `onboarding.spec.ts` until the limit lifts. It is kept in the suite as executable documentation of the behaviour, tagged `@ratelimit`, and must be un-skipped deliberately and run in isolation.
 
-`TC-SU-04` is intentionally absent: it was the original combined codegen recording that `TC-SU-02` and `TC-SU-05` through `TC-SU-09` were split out of, so the id is retired rather than reused.
+`TC-SU-04` has no automated test. It covers email uniqueness and format boundaries, which need a known pre-existing account and burn an address on every run, and its plus-addressing set is already covered by `TC-SU-06`. It stays in the test case document as a manual-only edge case.
 
-The onboarding spec asserts every option on every step is visible before answering, so it doubles as an account-specific UI check: a Personal run only ever sees Personal questions, and so on. A separate, fuller test-case document and coverage summary accompany this repo per the deliverables.
+The onboarding spec asserts every option on every step is visible before answering, so it doubles as an account-specific UI check: a Personal run only ever sees Personal questions, and so on.
+
+### Deliverables
+
+- **Test case document:** [`Saleshandy-Test-Cases.docx`](Saleshandy-Test-Cases.docx), 22 manual cases across sign-up, onboarding and account-specific validations.
+- **Automation coverage summary:** [`COVERAGE.md`](COVERAGE.md), mapping every manual case to automated, partial or manual-only, with the reason for each gap and the current verification status against the live app.
 
 > **Note on the sign-up path (as of 2026-07-25).** The live sign-up form is currently returning `"You have hit max signup limit. Try again after some time."` for every email address tried. This is an IP / account-level rate limit on the Saleshandy side, not a problem with the test data or selectors. While it is in effect, the specs that create a brand-new account (`signup.spec.ts` and `onboarding.spec.ts`) cannot be run end to end against the live app, and the Business and Clients onboarding steps in particular remain unverified against production UI. The code, page objects, and data for those flows are in place and follow the same verified pattern as the account-specific specs; they are expected to pass once sign-up access is restored. The account-specific specs (`account-specific.spec.ts`) are unaffected, because they reuse the pre-created accounts and never sign up.
 
