@@ -3,7 +3,7 @@ import fs from 'fs';
 import { LoginPage } from '../src/pages/LoginPage';
 import { credentialsFor } from '../src/data/credentials';
 import { AccountType } from '../src/types';
-import { AUTH_DIR, GoToUrl, hasFreshSession, sessionStatePath } from '../src/utils/helpers';
+import { AUTH_DIR, goToUrl, hasFreshSession, sessionStatePath } from '../src/utils/helpers';
 
 /**
  * Login once per account and save the session, so the real tests don't login
@@ -27,7 +27,7 @@ for (const type of accountTypes) {
     const { email, password } = credentialsFor(type);
 
     const loginPage = new LoginPage(page);
-    await GoToUrl(page);
+    await goToUrl(page);
     await loginPage.login(email, password);
     await loginPage.completeOtpManually();
 

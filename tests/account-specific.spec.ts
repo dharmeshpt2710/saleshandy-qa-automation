@@ -1,7 +1,9 @@
 import { test } from '../src/fixtures';
+import { DashboardPage } from '../src/pages/DashboardPage';
+import { OnboardingPage } from '../src/pages/OnboardingPage';
 import { AccountType } from '../src/types';
-import { ACCOUNT_TYPE_CARD, DASHBOARD_URL } from '../src/utils/constants';
-import { GoToUrl, expectUrl, expectHidden } from '../src/utils/helpers';
+import { DASHBOARD_URL } from '../src/utils/constants';
+import { goToUrl, expectUrl } from '../src/utils/helpers';
 
 /**
  * Account-specific tests that reuse a saved session (assignment 4.3). Each block
@@ -16,15 +18,18 @@ for (const account of accountTypes) {
     test.use({ account });
 
     test(`TC-OB-08: an onboarded ${account} user is not shown onboarding again`, async ({ page }) => {
-      await GoToUrl(page);
+      await goToUrl(page);
 
-      // Reused session is logged in, we land on the dashboard and not back on
-      // /login. This is what proves the reuse really worked, a stale session
-      // would redirect here and fail.
+      // A stale session would redirect to /login, so landing on the dashboard is
+      // what proves the session reuse really worked.
       await expectUrl(page, DASHBOARD_URL);
 
-      // Already onboarded, so the account-type card is not shown again.
-      await expectHidden(page.getByText(ACCOUNT_TYPE_CARD[account]));
+      // A "Let's Start" screen may come first, clicking it opens the dashboard.
+      const dashboard = new DashboardPage(page);
+      await dashboard.dismissLetsStartIfShown();
+      await dashboard.expectSequencesDashboard();
+
+      await new OnboardingPage(page).expectAccountTypeScreenHidden(account);
     });
   });
 }

@@ -10,7 +10,7 @@ export default defineConfig({
   testDir: './tests',
   // A full sign-up + onboarding walk-through takes a while, so allow 90s a test.
   timeout: 90_000,
-  fullyParallel: true,
+  fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
@@ -19,6 +19,7 @@ export default defineConfig({
     baseURL: 'https://my.saleshandy.com/login',
     trace: 'on-first-retry',
     headless: false,
+    
   },
 
   projects: [
