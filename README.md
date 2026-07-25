@@ -1,0 +1,187 @@
+# Saleshandy SDET Assignment
+
+End-to-end test automation for the Saleshandy sign-up and onboarding flows across the three account types the product supports: **Personal Use**, **Business**, and **Clients**.
+
+The core idea of the assignment is that each account type has its own sign-up form, its own onboarding questions, and its own post-onboarding UI, but there should be **one generic, parameterized flow** that handles all three based on the account type passed in. That is exactly how this framework is built: the flow logic is written once, and only the data (which questions, which answers) changes per account type.
+
+- **App under test:** https://my.saleshandy.com/
+- **Tool:** Playwright with TypeScript
+- **Browser:** Chromium
+
+---
+
+## Tools and technologies used
+
+| Purpose | Choice |
+| --- | --- |
+| Test runner / automation | [Playwright](https://playwright.dev/) (`@playwright/test`) |
+| Language | TypeScript |
+| Runtime | Node.js |
+| Config / secrets | `dotenv` (`.env` file, git-ignored) |
+| Reporting | Playwright HTML reporter |
+| CI | GitHub Actions (`.github/workflows/playwright.yml`) |
+
+---
+
+## Project setup
+
+**Prerequisites:** Node.js (LTS) and npm.
+
+1. Install dependencies:
+
+   ```bash
+   npm install
+   ```
+
+2. Install the Playwright browser (Chromium):
+
+   ```bash
+   npx playwright install chromium
+   ```
+
+3. Create your `.env` from the template and fill in the three pre-created accounts:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+   ```dotenv
+   PERSONAL_EMAIL=
+   PERSONAL_PASSWORD=
+
+   BUSINESS_EMAIL=
+   BUSINESS_PASSWORD=
+
+   CLIENTS_EMAIL=
+   CLIENTS_PASSWORD=
+   ```
+
+   These are the long-lived accounts (one per account type) that the suite logs into once and reuses. `.env` is git-ignored, so real credentials are never committed. See [Avoiding repeated login](#avoiding-repeated-login-assignment-43) for why these accounts exist.
+
+---
+
+## How to run the tests
+
+The tests run in **headed** mode on purpose, because logging in requires a one-time OTP that a person types into the browser (see [Assumptions](#assumptions)).
+
+```bash
+# Run the whole suite (setup + all specs)
+npm test
+
+# Same, but explicitly headed
+npm run test:headed
+
+# Open the HTML report from the last run
+npm run report
+
+# Type-check without running anything
+npm run typecheck
+```
+
+`npm test` is a single command even though logging in and testing are two phases. Playwright runs the `setup` project first (it signs into the three accounts and saves their sessions), then the `chromium` project runs the real specs against those saved sessions. The dependency between them is declared in `playwright.config.ts`, so you never run login manually.
+
+**Forcing a fresh login.** Saved sessions are trusted for 8 hours. If a session has expired and tests start bouncing back to `/login`, force a new login:
+
+```bash
+# macOS / Linux
+FORCE_LOGIN=1 npm test
+```
+
+```powershell
+# Windows PowerShell
+$env:FORCE_LOGIN=1; npm test
+```
+
+---
+
+## Framework structure
+
+```
+saleshandy-sdet-assignment/
+├── playwright.config.ts        # 2 projects: "setup" (login once) then "chromium" (real tests)
+├── .env.example                # template for the 3 reusable account credentials
+├── .github/workflows/          # GitHub Actions CI
+├── .auth/                      # saved login sessions per account (git-ignored, created at runtime)
+│
+├── src/
+│   ├── types.ts                # AccountType, TestUser, LoginCredentials
+│   │
+│   ├── data/                   # the ONLY place the three flows differ
+│   │   ├── onboardingData.ts   #   onboarding questions/answers per account type
+│   │   ├── userData.ts         #   sign-up user builder + Gmail dot-variant email generator
+│   │   └── credentials.ts      #   reads the 3 accounts from .env
+│   │
+│   ├── pages/                  # Page Objects (locators + actions, no assertions of intent)
+│   │   ├── SignUpPage.ts
+│   │   ├── LoginPage.ts
+│   │   ├── OnboardingPage.ts   #   one generic driver for all account types
+│   │   └── DashboardPage.ts
+│   │
+│   ├── auth/
+│   │   └── signUp.ts           # one generic sign-up + onboarding flow, parameterized by account type
+│   │
+│   ├── fixtures/
+│   │   └── index.ts            # custom fixture: test.use({ account }) loads that account's session
+│   │
+│   └── utils/
+│       ├── constants.ts        # shared paths, card text, selectors
+│       └── helpers.ts          # assertion helpers + session path / freshness logic
+│
+└── tests/
+    ├── auth.setup.ts           # logs into each account once, saves session under .auth/
+    ├── signup.spec.ts          # sign-up form: positive + negative
+    ├── onboarding.spec.ts      # full fresh sign-up + onboarding, one run per account type
+    └── account-specific.spec.ts# reuses saved sessions, asserts account-specific state
+```
+
+### How the "one generic flow" requirement is met
+
+The assignment asks for a single reusable sign-up flow parameterized by account type, not three separate scripts. This is implemented in two layers:
+
+- **`src/auth/signUp.ts`** exposes `signUp(page, accountType)`. Pass `'personal'`, `'business'`, or `'clients'` and it fills the form, picks the matching account card, and answers that type's onboarding steps.
+- **`src/data/onboardingData.ts`** is the only place the three flows differ. Each account type maps to an ordered list of steps (`heading`, the `options` to assert, and the `answer` to click). The `OnboardingPage` page object just loops over whichever list it is given, so adding or changing a question is a data edit, not a code change.
+
+Because of this, `onboarding.spec.ts` and `account-specific.spec.ts` each run the **same** test body once per account type in a loop, which is the direct proof that one flow handles all three.
+
+---
+
+## Avoiding repeated login (assignment 4.3)
+
+Logging into Saleshandy triggers a 4-digit OTP sent to the account's email, which cannot be automated end to end. Repeating that for every test would be slow and would need a human every time. The framework avoids it like this:
+
+1. **Login happens in a dedicated setup project, not in the tests.** `tests/auth.setup.ts` runs first (declared as a dependency of the `chromium` project in `playwright.config.ts`). It logs into each of the three accounts once and saves the browser session with `storageState()` to `.auth/<account>.json`.
+
+2. **Tests reuse the saved session instead of logging in.** The custom fixture in `src/fixtures/index.ts` lets a spec say `test.use({ account: 'business' })`, and it points Playwright's `storageState` at that account's saved session. The test starts already authenticated and already onboarded, so there is no login inside the test at all.
+
+3. **Login is not even repeated across runs.** `hasFreshSession()` in `src/utils/helpers.ts` skips the login in setup when a saved session file is younger than 8 hours. So on back-to-back runs, setup logs in zero times and the OTP is not needed at all. `FORCE_LOGIN=1` overrides this when a session has genuinely expired.
+
+4. **One account per type, created once and reused.** An account's type is fixed once it is onboarded, so the three reusable accounts are created by hand a single time and their credentials live in `.env`. The suite only ever logs into them, it never re-creates them.
+
+The result maps directly to the 4.3 checklist: login is not repeated in every test, a user is created once and reused, tests run faster (they skip both login and onboarding), and the whole thing is a small amount of well-scoped code (one setup file, one fixture, one helper).
+
+---
+
+## Test coverage
+
+| Spec | Scenario | Type | Runs per account type |
+| --- | --- | --- | --- |
+| `signup.spec.ts` | New user can sign up with valid data (`TC-SU-01`) | Positive | Personal only |
+| `signup.spec.ts` | Sign-up blocked when a required field is missing (`TC-SU-02`) | Negative | Personal only |
+| `onboarding.spec.ts` | Full onboarding completes through every step (`TC-OB`) | Positive | Personal, Business, Clients |
+| `account-specific.spec.ts` | An onboarded user is not shown onboarding again (`TC-OB-08`) | Account-specific | Personal, Business, Clients |
+
+The onboarding spec asserts every option on every step is visible before answering, so it doubles as an account-specific UI check: a Personal run only ever sees Personal questions, and so on. A separate, fuller test-case document and coverage summary accompany this repo per the deliverables.
+
+> **Note on the sign-up path (as of 2026-07-25).** The live sign-up form is currently returning `"You have hit max signup limit. Try again after some time."` for every email address tried. This is an IP / account-level rate limit on the Saleshandy side, not a problem with the test data or selectors. While it is in effect, the specs that create a brand-new account (`signup.spec.ts` and `onboarding.spec.ts`) cannot be run end to end against the live app, and the Business and Clients onboarding steps in particular remain unverified against production UI. The code, page objects, and data for those flows are in place and follow the same verified pattern as the account-specific specs; they are expected to pass once sign-up access is restored. The account-specific specs (`account-specific.spec.ts`) are unaffected, because they reuse the pre-created accounts and never sign up.
+
+---
+
+## Assumptions
+
+- **OTP is entered by a human during setup.** Login sends a 4-digit code to the account email, and the inbox is not readable from the tests. When the setup phase runs (only when there is no fresh session), it pauses on the verification screen and prints a prompt; you type the code into the open browser and it continues. This is why the suite runs headed.
+- **The three reusable accounts already exist and are fully onboarded.** Their type cannot be changed after onboarding, so they are set up once by hand. `account-specific.spec.ts` relies on them being past onboarding.
+- **Sign-up is rate-limited on the server side right now, and no email variant gets around it.** Every address format was tried: plus-addressing (`name+tag@gmail.com`, rejected as a bad email), a unique random/timestamp suffix (rejected as a bad email because it is not a real inbox), and genuine Gmail dot-variants (which the form does accept). Even with valid dot-variants, the live form now rejects every registration with a max-signup-limit message (see the note under [Test coverage](#test-coverage)). This confirms the block is an IP / account-level rate limit on Saleshandy's side, not something a different email could fix. The sign-up and onboarding specs are therefore built and reviewed against the flow but not verified end to end against the live app until that limit lifts.
+- **Sign-up email addresses use Gmail dot-variants.** `src/data/userData.ts` generates fresh variants of one Gmail address (Gmail ignores dots, so they all reach the same inbox, but Saleshandy treats each as a new address). Each variant used to sign up is effectively burned, since Saleshandy will reject it on a later run.
+- **Which dashboard appears after onboarding depends on the product choice, not the account type.** Choosing "Lead Finder" lands on the Lead Finder dashboard; everything else lands on Sequences. The current flows all answer "Cold outreach", so they land on Sequences.
+- **Chromium only.** The config runs a single browser project to keep runs fast. Cross-browser was out of scope for this assignment.
+- **Selectors lean on visible text and roles.** The app exposes few stable test ids, so locators use placeholder text, roles, and card text (several taken from Playwright codegen). Shared strings and selectors are centralized in `src/utils/constants.ts` so a UI wording change is a one-line edit.
