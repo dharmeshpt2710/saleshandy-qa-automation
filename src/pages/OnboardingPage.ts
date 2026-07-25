@@ -1,6 +1,6 @@
 import { Locator, Page } from '@playwright/test';
 import { AccountType } from '../types';
-import { Step } from '../data/onboardingData';
+import { Step, onboardingSteps } from '../data/onboardingData';
 import { ACCOUNT_TYPE_CARD, ONBOARDING_NEXT_BUTTON } from '../utils/constants';
 import { expectVisible } from '../utils/helpers';
 
@@ -42,5 +42,13 @@ export class OnboardingPage {
     for (const step of steps) {
       await this.answerStep(step);
     }
+  }
+
+  // Full onboarding for a type: pick the account card, then answer its steps.
+  // Same entry point whether onboarding runs right after sign-up or is resumed
+  // on a later login.
+  async completeOnboarding(type: AccountType) {
+    await this.chooseAccountType(type);
+    await this.completeSteps(onboardingSteps[type]);
   }
 }
